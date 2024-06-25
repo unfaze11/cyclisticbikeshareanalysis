@@ -1,0 +1,163 @@
+---
+title: "Cyclistic"
+author: "Rion Sutradhar"
+date: "2024-06-14"
+output: html_document
+---
+
+# All necessary libraries and installed and initialised
+
+```{r Libraries, echo=TRUE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(janitor)
+library(lubridate)
+library(ggplot2)
+library(scales)
+library(dplyr)
+library(gridExtra)
+```
+
+# *Set the directory to the location where all the files are present*
+
+```{r Set Working Directory, echo=TRUE}
+setwd('C:/Users/rions/Desktop/My Projects/Cyclistic bike share analysis')
+```
+
+# *Load all the datasets of individual months for 2023*
+
+```{r Datasets}
+jandf <- read.csv("./Data/202301-divvy-tripdata.csv")
+febdf <- read.csv("./Data/202302-divvy-tripdata.csv")
+mardf <- read.csv("./Data/202303-divvy-tripdata.csv")
+aprdf <- read.csv("./Data/202304-divvy-tripdata.csv")
+maydf <- read.csv("./Data/202305-divvy-tripdata.csv")
+jundf <- read.csv("./Data/202306-divvy-tripdata.csv")
+juldf <- read.csv("./Data/202307-divvy-tripdata.csv")
+augdf <- read.csv("./Data/202308-divvy-tripdata.csv")
+sepdf <- read.csv("./Data/202309-divvy-tripdata.csv")
+octdf <- read.csv("./Data/202310-divvy-tripdata.csv")
+novdf <- read.csv("./Data/202311-divvy-tripdata.csv")
+decdf <- read.csv("./Data/202312-divvy-tripdata.csv")
+```
+
+# *Merge to single data frame*
+
+```{r Merge datasets}
+bikes_data <-rbind(jandf, febdf, mardf, aprdf, maydf, jundf, juldf, 
+                   augdf, sepdf, octdf, novdf, decdf)
+
+```
+
+# *Remove all empty Rows and Columns*
+
+```{r Empty R&C, echo=TRUE}
+bikes_data <- remove_empty(bikes_data, which = c('cols', 'rows'))
+summary(bikes_data)
+```
+
+# *Drop all null values*
+
+```{r NULL Values, echo=TRUE}
+bikes_data <- bikes_data %>%
+  drop_na()
+summary(bikes_data)
+```
+
+# *Parse strings and convert them to Date/Time*
+
+```{r Convert to date & time}
+bikes_data$started_at <- ymd_hms(bikes_data$started_at)
+bikes_data$ended_at <- ymd_hms(bikes_data$ended_at)
+```
+
+# *Calculate trip duration of all instances in minutes*
+
+```{r Trip duration}
+bikes_data <- bikes_data %>%
+  mutate(trip_duration=as.numeric(difftime(ended_at, started_at, units="mins")))
+```
+
+# *Filter out negative trip duration*
+
+```{r (-ve) trip remove}
+bikes_data <- bikes_data %>%
+  filter(trip_duration > 0)
+```
+
+# *Calculate day of week and hour of day*
+
+```{r Week & hour calculation, echo=TRUE}
+bikes_data <- bikes_data %>%
+  mutate(day_of_week = wday(started_at, label = TRUE, abbr = FALSE), hour_of_day = hour(started_at))
+head(bikes_data)
+```
+
+# *Trip duration summary of mean, median, max and min*
+
+```{r Statistics, echo=FALSE}
+trip_duration_summary <- bikes_data %>%
+  group_by(member_casual) %>%
+  summarise(mean_trip_duration = mean(trip_duration),
+            median_trip_duration = median(trip_duration),
+            max_trip_duration = as.numeric(max(trip_duration)),
+            min_trip_duration = as.numeric(min(trip_duration)))
+print(trip_duration_summary)
+```
+
+# *Day of week summary to count the number of times bike has been rented in a day arranged in ascending order*
+
+```{r No. of Trips per day, echo=TRUE, message=FALSE}
+day_of_week_summary <- bikes_data %>%
+  group_by(member_casual, day_of_week) %>%
+  summarise(trip_count = n()) %>%
+  arrange(member_casual, day_of_week)
+print(day_of_week_summary)
+```
+
+# *Hour of day summary to count the number of times bike has been rented in an hour arranged in ascending order*
+
+```{r No. of Trips per hour, echo=TRUE, message=FALSE}
+hour_of_day_summary <- bikes_data %>%
+  group_by(member_casual, hour_of_day) %>%
+  summarise(trip_count = n()) %>%
+  arrange(member_casual, hour_of_day)
+print(hour_of_day_summary, n=100)
+```
+
+```{r Mean trip Graph, include=FALSE}
+mean_plot <- ggplot(trip_duration_summary, aes(x = member_casual, y = mean_trip_duration, fill = member_casual)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Mean Trip Duration by User Type", y = "Mean Trip Duration (minutes)", x = "User Type") +
+  theme_minimal()
+```
+
+```{r Median trip Graph, include=FALSE}
+median_plot <- ggplot(trip_duration_summary, aes(x = member_casual, y = median_trip_duration, fill = member_casual)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Median Trip Duration by User Type", y = "Median Trip Duration (minutes)", x = "User Type") +
+  theme_minimal()
+```
+
+# *Bar plot for mean and median trip duration*
+
+```{r Grid View, echo=FALSE}
+grid.arrange(mean_plot, median_plot)
+```
+
+# *Plot for trips by day of week*
+
+```{r Trips per day in a week plot, echo=FALSE}
+ggplot(day_of_week_summary, aes(x = day_of_week, y = trip_count, fill = member_casual)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_y_continuous(labels=comma) +
+  labs(title = "Trips by Day of Week", y = "Number of Trips", x = "Day of Week")
+```
+
+# *Plot trips by hour of day*
+
+```{r Trips per hour of day graph, echo=FALSE}
+ggplot(hour_of_day_summary, aes(x = hour_of_day, y = trip_count, fill = member_casual)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_y_continuous(labels=comma) +
+  labs(title = "Trips by Hour of Day", y = "Number of Trips", x = "Hour of Day")
+```
